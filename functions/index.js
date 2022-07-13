@@ -2,8 +2,9 @@ const fetch = require('node-fetch');
 // The Cloud Functions for Firebase SDK to create Cloud Functions and set up triggers.
 const functions = require('firebase-functions');
 
-//Admin acces to database
-const { initializeApp } = require('firebase-admin/app');
+// The Firebase Admin SDK to access Realtime Database.
+const admin = require('firebase-admin');
+admin.initializeApp();
 
 exports.mirrorCron = functions.pubsub.schedule('every 5 minutes').onRun((context) => {
     console.log('This will be run every 5 minutes!');
@@ -24,8 +25,42 @@ exports.mirrorTest = functions.runWith({ secrets: ["API_ID", "API_SECRET"] }).ht
     
     await getProducts(auth).then(data => body = data).catch(err => res.status(400).end(JSON.stringify(err)));
 
-    if (!body) {
+    if (!body || !body.data) {
         return res.status(404).end('Unable to fetch the app data :/');
+    }
+
+    var db = admin.database();
+    var products = Object.fromEntries(body.data.map((p) => [p.productNumber.replace(/\./g,"-"), p]));
+    await db.ref().update({
+        products: products
+    }, (error) => {
+        if (error) {
+          body = error;
+        }
+        else {
+            body = "Sucessfully added data";
+        }
+    });
+
+    res.send(body);
+});
+
+exports.dbTest = functions.https.onRequest(async (req, res) => {
+    let body = '';
+
+    var db = admin.database();
+    var ref = db.ref("products");
+    await ref.child(`my-awesome-product-${Date.now()}`).set({
+        id: "596897",
+        description: "Lora Lipsum..."
+    }, (error) => {
+        if (!error) {
+          body = "Sucessfully added data";
+        }
+    });
+
+    if (!body) {
+        return res.status(404).end('Unable to set the app data :/');
     }
 
     res.send(body);

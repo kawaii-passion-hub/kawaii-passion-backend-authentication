@@ -65,3 +65,4 @@ node_modules/
 # dotenv environment variables file
 .env
 functions/.secret.local
+functions/service_acounts
