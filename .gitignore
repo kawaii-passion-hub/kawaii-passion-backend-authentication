@@ -66,3 +66,4 @@ node_modules/
 .env
 functions/.secret.local
 functions/service_acounts
+.local-state

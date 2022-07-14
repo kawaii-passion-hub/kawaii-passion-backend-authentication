@@ -24,15 +24,24 @@ exports.mirrorTest = functions.runWith({ secrets: ["API_ID", "API_SECRET"] }).ht
     const auth = `${body.token_type} ${body.access_token}`;
     
     await getProducts(auth).then(data => body = data).catch(err => res.status(400).end(JSON.stringify(err)));
+    var products = Object.fromEntries(body.data.map((p) => [p.productNumber.replace(/\./g,"-"), p]));
+
+    if (!body || !body.data) {
+        return res.status(404).end('Unable to fetch the app data :/');
+    }
+    
+    body = '';
+    await getOrders(auth).then(data => body = data).catch(err => res.status(400).end(JSON.stringify(err)));
+    var orders = Object.fromEntries(body.data.map((p) => [p.orderNumber.replace(/\./g,"-"), p]));
 
     if (!body || !body.data) {
         return res.status(404).end('Unable to fetch the app data :/');
     }
 
     var db = admin.database();
-    var products = Object.fromEntries(body.data.map((p) => [p.productNumber.replace(/\./g,"-"), p]));
     await db.ref().update({
-        products: products
+        products: products,
+        orders: orders
     }, (error) => {
         if (error) {
           body = error;
@@ -45,29 +54,28 @@ exports.mirrorTest = functions.runWith({ secrets: ["API_ID", "API_SECRET"] }).ht
     res.send(body);
 });
 
-exports.dbTest = functions.https.onRequest(async (req, res) => {
-    let body = '';
-
-    var db = admin.database();
-    var ref = db.ref("products");
-    await ref.child(`my-awesome-product-${Date.now()}`).set({
-        id: "596897",
-        description: "Lora Lipsum..."
-    }, (error) => {
-        if (!error) {
-          body = "Sucessfully added data";
-        }
+exports.logOrderCreation = functions.database.ref('orders/{id}')
+    .onCreate((snapshot, context) => {
+        console.log(`Order created occured ${snapshot.toJSON()}`);
+        return null;
     });
 
-    if (!body) {
-        return res.status(404).end('Unable to set the app data :/');
-    }
-
-    res.send(body);
-});
+exports.logorderStateChange = functions.database.ref('orders/{id}/stateId')
+    .onUpdate((change, context) => {
+        console.log(`Order state changed ${change.before.toJSON()} -> ${change.after.toJSON()}`);
+        return null;
+    });
 
 async function getProducts(auth) {
-    return await fetch(`${process.env.SHOP_URL}/api/product?`,
+    return await getShopApiResponse(auth, '/api/product?');
+}
+
+async function getOrders(auth) {
+    return await getShopApiResponse(auth, '/api/order?');
+}
+
+async function getShopApiResponse(auth, endpoint) {
+    return await fetch(`${process.env.SHOP_URL}${endpoint}`,
     {
         method: 'GET',
         headers: {
