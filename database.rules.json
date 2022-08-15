@@ -1,13 +1,5 @@
 {
   "rules": {
-    "products": {
-      ".read": "auth.token.whitelisted === true",
-      ".write": false
-    },
-    "orders": {
-      ".read": "auth.token.whitelisted === true",
-      ".write": false
-    },
     "metadata": {
       "$user_id": {
         ".read": "$user_id === auth.uid",
